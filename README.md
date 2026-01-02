@@ -1,5 +1,5 @@
 # Attendance Recorder
-# Created by: VIBE CODING
+### Created by: VIBE CODING - 037
 This is a desktop application for recording team attendance.
 
 ## Tech Stack
@@ -14,7 +14,7 @@ This is a desktop application for recording team attendance.
 ## Application Features
 
 ### TAB 1: Attendance Image Generator
-![Attendance Image Generator](screenshots\ImageGenerator.png)
+![Attendance Image Generator](screenshots/ImageGenerator.png)
 - Generate attendance image for a **custom date range**.
 - **Export** attendance data as **PDF** or **CSV**.
 - Add a **company logo** to the generated image.
@@ -23,7 +23,7 @@ This is a desktop application for recording team attendance.
 - Generated output is saved locally as a JPG image.
 
 ### TAB 2: Daily Standup Entry
-![Daily Standup Entry](screenshots\DailyStandupEntry.png)
+![Daily Standup Entry](screenshots/DailyStandupEntry.png)
 - User inputs attendance for team members.
 - **"Mark all as..."** to quickly set status for all members.
 - Add **notes** for each attendance entry.
@@ -34,7 +34,7 @@ This is a desktop application for recording team attendance.
 - Saves data locally.
 
 ### TAB 3: History
-![History](screenshots\History.png)
+![History](screenshots/History.png)
 - Display attendance data for a selected **date range**.
 - **Sort** data by clicking on column headers.
 - **Search** for specific records.
@@ -43,7 +43,7 @@ This is a desktop application for recording team attendance.
 - **Bulk edit** multiple records at once.
 
 ### TAB 4: Settings
-![Settings](screenshots\Settings.png)
+![Settings](screenshots/Settings.png)
 - **Manage Team Members**: Add, Edit, Delete.
 - **Manage Attendance Statuses**: Add, Edit, Delete, with color codes.
 - **Import/Export**: Manage team members and statuses from/to CSV files.
