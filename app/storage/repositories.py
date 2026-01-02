@@ -70,7 +70,8 @@ class AttendanceRecordRepository(BaseRepository):
                 tm.name AS member_name,
                 ar.record_date,
                 ast.id AS status_id,
-                ast.status AS status_name
+                ast.status AS status_name,
+                ar.notes
             FROM attendance_records ar
             JOIN team_members tm ON ar.member_id = tm.id
             JOIN attendance_statuses ast ON ar.status_id = ast.id
@@ -100,9 +101,17 @@ class AttendanceRecordRepository(BaseRepository):
         """
         return self._execute(query, (start_date, end_date))
 
-    def add_or_update(self, member_id, record_date, status_id):
+    def add_or_update(self, member_id, record_date, status_id, notes=None):
         existing_record = self.get_attendance_for_member_and_date(member_id, record_date)
         if existing_record:
-            self.update(existing_record['id'], {'status_id': status_id})
+            self.update(existing_record['id'], {'status_id': status_id, 'notes': notes})
         else:
-            self.add({'member_id': member_id, 'record_date': record_date, 'status_id': status_id})
+            self.add({'member_id': member_id, 'record_date': record_date, 'status_id': status_id, 'notes': notes})
+
+    def bulk_update_status(self, record_ids, status_id):
+        if not record_ids:
+            return
+        placeholders = ', '.join(['?' for _ in record_ids])
+        query = f"UPDATE {self.table_name} SET status_id = ? WHERE id IN ({placeholders})"
+        params = [status_id] + record_ids
+        self._execute(query, params)

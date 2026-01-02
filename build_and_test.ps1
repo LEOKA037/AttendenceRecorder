@@ -12,6 +12,10 @@ if ($runningProcess) {
     Write-Host "Stopping main.py before building the executable..."
     Stop-Process -Id $process.Id -Force
 
+    # Force kill any lingering main.exe processes
+    Write-Host "Forcefully terminating any lingering main.exe processes..."
+    taskkill /F /IM main.exe | Out-Null
+
     # 4. Generate the .exe
     Write-Host "Generating the executable..."
     python -m PyInstaller --onefile --noconsole main.py

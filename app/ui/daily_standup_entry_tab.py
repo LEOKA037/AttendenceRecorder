@@ -13,7 +13,8 @@ class DailyStandupEntryTab(BaseTab):
         self.attendance_service = app_instance.attendance_service
         self.team_member_service = app_instance.team_member_service
         self.selected_date = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
-        self.attendance_entries = {} # {member_id: StringVar for status}
+        self.attendance_entries = {} # {member_id: {'status': StringVar, 'notes': StringVar}}
+        self.mark_all_status_var = tk.StringVar()
         self.create_widgets()
         self.load_data_for_selected_date()
 
@@ -34,6 +35,20 @@ class DailyStandupEntryTab(BaseTab):
         self.attendance_frame = ttk.LabelFrame(self, text="Team Attendance")
         self.attendance_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
+        # Mark all as frame
+        mark_all_frame = ttk.Frame(self.attendance_frame)
+        mark_all_frame.pack(fill="x", pady=5)
+        ttk.Label(mark_all_frame, text="Mark all as:").pack(side="left", padx=5)
+        
+        statuses = self.attendance_service.get_all_attendance_statuses()
+        status_options = [s['status'] for s in statuses]
+        self.mark_all_combo = ttk.Combobox(mark_all_frame, textvariable=self.mark_all_status_var, values=status_options, state="readonly")
+        self.mark_all_combo.pack(side="left", padx=5)
+        if status_options:
+            self.mark_all_status_var.set(status_options[0])
+            
+        ttk.Button(mark_all_frame, text="Apply", command=self._mark_all_as).pack(side="left", padx=5)
+
         self.canvas = tk.Canvas(self.attendance_frame)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
 
@@ -51,6 +66,15 @@ class DailyStandupEntryTab(BaseTab):
         # Save button
         ttk.Button(self, text="Save Attendance", command=self._save_attendance).pack(pady=10)
 
+    def _mark_all_as(self):
+        selected_status = self.mark_all_status_var.get()
+        if not selected_status:
+            messagebox.showwarning("Warning", "Please select a status to apply.")
+            return
+
+        for entry in self.attendance_entries.values():
+            entry['status'].set(selected_status)
+
     def _on_date_change(self, *args):
         self.load_data_for_selected_date()
 
@@ -67,19 +91,33 @@ class DailyStandupEntryTab(BaseTab):
             ttk.Label(self.scrollable_frame, text="No team members configured. Please go to Settings tab to add team members.").pack(pady=10)
             return
 
+        # Header
+        header_frame = ttk.Frame(self.scrollable_frame)
+        header_frame.pack(fill="x", pady=2)
+        ttk.Label(header_frame, text="Team Member", width=20, anchor="w", font='TkDefaultFont 9 bold').pack(side="left", padx=5)
+        ttk.Label(header_frame, text="Status", width=20, anchor="w", font='TkDefaultFont 9 bold').pack(side="left", padx=5)
+        ttk.Label(header_frame, text="Notes", width=40, anchor="w", font='TkDefaultFont 9 bold').pack(side="left", padx=5)
+
+
         for member in members:
             row_frame = ttk.Frame(self.scrollable_frame)
             row_frame.pack(fill="x", pady=2)
             ttk.Label(row_frame, text=f"{member.name}:", width=20, anchor="w").pack(side="left", padx=5)
             
-            # StringVar to hold the selected status for this member
+            # Status Dropdown
             status_var = tk.StringVar(row_frame)
             if status_options:
                 status_var.set(status_options[0]) # Default to first status or "NA"
             
             option_menu = ttk.OptionMenu(row_frame, status_var, status_var.get(), *status_options)
             option_menu.pack(side="left", fill="x", expand=True, padx=5)
-            self.attendance_entries[member.id] = status_var
+
+            # Notes Entry
+            notes_var = tk.StringVar(row_frame)
+            notes_entry = ttk.Entry(row_frame, textvariable=notes_var, width=40)
+            notes_entry.pack(side="left", fill="x", expand=True, padx=5)
+
+            self.attendance_entries[member.id] = {'status': status_var, 'notes': notes_var}
         
         self.canvas.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -88,26 +126,28 @@ class DailyStandupEntryTab(BaseTab):
         selected_date_str = self.selected_date.get()
         records = self.attendance_service.get_attendance_for_date(selected_date_str)
         
-        # Create a dictionary for quick lookup: {member_id: status_name}
-        current_attendance = {record['member_id']: record['status_name'] for record in records}
+        # Create a dictionary for quick lookup: {member_id: {'status_name': str, 'notes': str}}
+        current_attendance = {record['member_id']: {'status_name': record['status_name'], 'notes': record['notes']} for record in records}
         
         statuses = self.attendance_service.get_all_attendance_statuses()
         status_map = {s['status']: s['id'] for s in statuses} # {status_name: status_id}
 
         members = self.team_member_service.get_all_members()
 
-        # Update the OptionMenu for each member
+        # Update the OptionMenu and Notes for each member
         for member in members:
             if member.id in self.attendance_entries:
-                status_var = self.attendance_entries[member.id]
+                entry = self.attendance_entries[member.id]
                 if member.id in current_attendance:
-                    status_var.set(current_attendance[member.id])
+                    entry['status'].set(current_attendance[member.id]['status_name'])
+                    entry['notes'].set(current_attendance[member.id]['notes'] or "")
                 else:
                     # Default to 'NA' if available, otherwise first option
                     if "NA" in status_map:
-                        status_var.set("NA")
-                    elif status_var.get() not in status_map and statuses:
-                         status_var.set(statuses[0]['status'])
+                        entry['status'].set("NA")
+                    elif statuses:
+                         entry['status'].set(statuses[0]['status'])
+                    entry['notes'].set("")
 
     def _save_attendance(self):
         selected_date_str = self.selected_date.get()
@@ -120,15 +160,23 @@ class DailyStandupEntryTab(BaseTab):
 
             statuses = self.attendance_service.get_all_attendance_statuses()
             status_map = {s['status']: s['id'] for s in statuses}
+            members = {m.id: m.name for m in self.team_member_service.get_all_members()}
+            
+            summary = "Attendance Summary:\n"
+            for member_id, entry in self.attendance_entries.items():
+                member_name = members.get(member_id, f"ID: {member_id}")
+                summary += f"- {member_name}: {entry['status'].get()} (Notes: {entry['notes'].get()})\n"
 
-            for member_id, status_var in self.attendance_entries.items():
-                status_name = status_var.get()
-                status_id = status_map.get(status_name)
-                if status_id is None:
-                    messagebox.showerror("Error", f"Invalid status selected for member ID {member_id}: {status_name}")
-                    return
-                self.attendance_service.record_attendance(member_id, selected_date_str, status_id)
-            messagebox.showinfo("Success", f"Attendance saved for {selected_date_str}.")
+            if messagebox.askyesno("Confirm Save", summary + "\nDo you want to save this attendance?"):
+                for member_id, entry in self.attendance_entries.items():
+                    status_name = entry['status'].get()
+                    notes = entry['notes'].get()
+                    status_id = status_map.get(status_name)
+                    if status_id is None:
+                        messagebox.showerror("Error", f"Invalid status selected for member ID {member_id}: {status_name}")
+                        return
+                    self.attendance_service.record_attendance(member_id, selected_date_str, status_id, notes)
+                messagebox.showinfo("Success", f"Attendance saved for {selected_date_str}.")
         except ValueError as e:
             messagebox.showerror("Error", str(e))
         except Exception as e:

@@ -15,15 +15,22 @@ class HistoryTab(BaseTab):
         self.end_date_var = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
         self.filter_member_var = tk.StringVar(value="All")
         self.filter_status_var = tk.StringVar(value="All")
+        self.search_var = tk.StringVar()
         self.full_history_data = [] # To store all data for the selected date range
         self.edit_button = None
+        self.bulk_edit_button = None
+        self.sort_column = "Date"
+        self.sort_direction = "asc"
         self.create_widgets()
         self.load_history()
 
     def create_widgets(self):
         # Date range selection
-        date_range_frame = ttk.Frame(self)
-        date_range_frame.pack(pady=10)
+        top_frame = ttk.Frame(self)
+        top_frame.pack(fill="x", pady=5, padx=10)
+
+        date_range_frame = ttk.Frame(top_frame)
+        date_range_frame.pack(side="left")
 
         ttk.Label(date_range_frame, text="Start Date:").pack(side="left", padx=5)
         self.start_date_entry = DateEntry(date_range_frame, width=12, background='darkblue',
@@ -43,9 +50,20 @@ class HistoryTab(BaseTab):
         
         ttk.Button(date_range_frame, text="Load History", command=self.load_history).pack(side="left", padx=10)
 
+        # Search bar
+        search_frame = ttk.Frame(top_frame)
+        search_frame.pack(side="right")
+        
+        search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=30)
+        search_entry.pack(side="left", padx=5)
+        search_entry.bind("<Return>", self._apply_filters)
+        
+        ttk.Button(search_frame, text="Search", command=self._apply_filters).pack(side="left", padx=5)
+        ttk.Button(search_frame, text="Clear", command=self._clear_search).pack(side="left", padx=5)
+
         # Filter widgets
         filter_frame = ttk.Frame(self)
-        filter_frame.pack(pady=5)
+        filter_frame.pack(fill="x", pady=5, padx=10)
 
         ttk.Label(filter_frame, text="Filter by Member:").pack(side="left", padx=5)
         self.member_filter_combo = ttk.Combobox(filter_frame, textvariable=self.filter_member_var, state="readonly")
@@ -58,10 +76,10 @@ class HistoryTab(BaseTab):
         self.status_filter_combo.bind("<<ComboboxSelected>>", self._apply_filters)
 
         # Attendance data display (Treeview)
-        self.tree = ttk.Treeview(self, columns=("Date", "Team Member", "Status"), show="headings")
-        self.tree.heading("Date", text="Date")
-        self.tree.heading("Team Member", text="Team Member")
-        self.tree.heading("Status", text="Status")
+        self.tree = ttk.Treeview(self, columns=("Date", "Team Member", "Status"), show="headings", selectmode="extended")
+        
+        for col in self.tree['columns']:
+            self.tree.heading(col, text=col, command=lambda c=col: self._sort_by(c))
 
         self.tree.column("Date", width=100, anchor="center")
         self.tree.column("Team Member", width=150, anchor="w")
@@ -77,10 +95,89 @@ class HistoryTab(BaseTab):
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
         self.tree.bind("<Double-1>", self._open_edit_window)
 
-        # Edit button
-        self.edit_button = ttk.Button(self, text="Edit Selected", command=self._open_edit_window, state="disabled")
-        self.edit_button.pack(pady=5)
+        # Edit buttons
+        edit_button_frame = ttk.Frame(self)
+        edit_button_frame.pack(pady=5)
+        self.edit_button = ttk.Button(edit_button_frame, text="Edit Selected", command=self._open_edit_window, state="disabled")
+        self.edit_button.pack(side="left", padx=5)
+        self.bulk_edit_button = ttk.Button(edit_button_frame, text="Bulk Edit", command=self._open_bulk_edit_window, state="disabled")
+        self.bulk_edit_button.pack(side="left", padx=5)
+        
+    def _clear_search(self):
+        self.search_var.set("")
+        self._apply_filters()
 
+    def _sort_by(self, col):
+        if self.sort_column == col:
+            self.sort_direction = "desc" if self.sort_direction == "asc" else "asc"
+        else:
+            self.sort_column = col
+            self.sort_direction = "asc"
+        
+        self._apply_filters()
+
+    def _on_tree_select(self, event=None):
+        num_selected = len(self.tree.selection())
+        if num_selected == 1:
+            self.edit_button.config(state="normal")
+            self.bulk_edit_button.config(state="disabled")
+        elif num_selected > 1:
+            self.edit_button.config(state="disabled")
+            self.bulk_edit_button.config(state="normal")
+        else:
+            self.edit_button.config(state="disabled")
+            self.bulk_edit_button.config(state="disabled")
+
+    def _open_bulk_edit_window(self):
+        selected_ids = self.tree.selection()
+        if not selected_ids:
+            return
+
+        edit_window = tk.Toplevel(self)
+        edit_window.title(f"Bulk Edit {len(selected_ids)} Records")
+        edit_window.transient(self)
+        edit_window.grab_set()
+
+        main_frame = ttk.Frame(edit_window, padding="10")
+        main_frame.pack(fill="both", expand=True)
+
+        ttk.Label(main_frame, text="Select new status:").pack(pady=5)
+
+        status_var = tk.StringVar()
+        statuses = self.attendance_service.get_all_attendance_statuses()
+        status_names = [s['status'] for s in statuses]
+        status_map = {s['status']: s['id'] for s in statuses}
+        status_combo = ttk.Combobox(main_frame, textvariable=status_var, values=status_names, state="readonly")
+        status_combo.pack(pady=5)
+        if status_names:
+            status_combo.set(status_names[0])
+
+        def _save_bulk_changes():
+            try:
+                new_status_name = status_var.get()
+                if not new_status_name:
+                    messagebox.showwarning("Warning", "Please select a status.", parent=edit_window)
+                    return
+                
+                new_status_id = status_map[new_status_name]
+                
+                if messagebox.askyesno("Confirm Bulk Edit", f"Are you sure you want to change the status to '{new_status_name}' for {len(selected_ids)} records?", parent=edit_window):
+                    self.attendance_service.bulk_update_status(selected_ids, new_status_id)
+                    messagebox.showinfo("Success", "Records updated successfully.", parent=edit_window)
+                    edit_window.destroy()
+                    self.load_history()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update records: {e}", parent=edit_window)
+
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=10)
+
+        save_button = ttk.Button(button_frame, text="Save", command=_save_bulk_changes)
+        save_button.pack(side="left", padx=10)
+
+        cancel_button = ttk.Button(button_frame, text="Cancel", command=edit_window.destroy)
+        cancel_button.pack(side="left", padx=10)
+        
     def _on_tree_select(self, event=None):
         if self.tree.selection():
             self.edit_button.config(state="normal")
@@ -197,14 +294,35 @@ class HistoryTab(BaseTab):
             self.tree.delete(i)
 
         filtered_data = self.full_history_data
+        
+        # Filter by member and status
         selected_member = self.filter_member_var.get()
-        selected_status = self.filter_status_var.get()
-
         if selected_member != "All":
             filtered_data = [row for row in filtered_data if row['member_name'] == selected_member]
 
+        selected_status = self.filter_status_var.get()
         if selected_status != "All":
             filtered_data = [row for row in filtered_data if row['status_name'] == selected_status]
+
+        # Filter by search term
+        search_term = self.search_var.get().lower()
+        if search_term:
+            filtered_data = [
+                row for row in filtered_data if
+                search_term in str(row['record_date']).lower() or
+                search_term in str(row['member_name']).lower() or
+                search_term in str(row['status_name']).lower()
+            ]
+
+        # Sorting
+        sort_key_map = {
+            "Date": "record_date",
+            "Team Member": "member_name",
+            "Status": "status_name"
+        }
+        sort_key = sort_key_map.get(self.sort_column)
+        if sort_key:
+            filtered_data.sort(key=lambda x: x[sort_key], reverse=(self.sort_direction == "desc"))
 
         for record in filtered_data:
             self.tree.insert("", "end", iid=record['id'], values=(record['record_date'], record['member_name'], record['status_name']))

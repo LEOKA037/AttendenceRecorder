@@ -56,11 +56,19 @@ class Database:
                     member_id INTEGER NOT NULL,
                     record_date TEXT NOT NULL,
                     status_id INTEGER NOT NULL,
+                    notes TEXT,
                     FOREIGN KEY (member_id) REFERENCES team_members (id),
                     FOREIGN KEY (status_id) REFERENCES attendance_statuses (id),
                     UNIQUE(member_id, record_date)
                 )
             ''')
+
+            # Add notes column to existing table if it doesn't exist
+            try:
+                cursor.execute("SELECT notes FROM attendance_records LIMIT 1")
+            except sqlite3.OperationalError:
+                cursor.execute("ALTER TABLE attendance_records ADD COLUMN notes TEXT")
+                
             conn.commit()
 
         self._seed_initial_data()
