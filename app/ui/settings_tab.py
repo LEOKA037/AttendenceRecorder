@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox, colorchooser
 from tkinter import filedialog
 import csv
 import os
+import json
 import shutil
 import webbrowser
 from app.storage.database import DATABASE_FILE
@@ -94,9 +95,56 @@ class SettingsTab(BaseTab):
         ttk.Button(db_frame, text="Backup Database", command=self._backup_database).pack(pady=10)
         ttk.Button(db_frame, text="Restore Database", command=self._restore_database).pack(pady=10)
 
-        # About button
-        about_button = ttk.Button(right_frame, text="About", command=self._show_about)
-        about_button.pack(pady=20)
+        # Frame for Tab Management
+        tab_frame = ttk.LabelFrame(right_frame, text="Tab Management")
+        tab_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.tab_listbox = tk.Listbox(tab_frame, height=5)
+        self.tab_listbox.pack(fill="both", expand=True)
+
+        tab_button_frame = ttk.Frame(tab_frame)
+        tab_button_frame.pack(fill="x", pady=5)
+        ttk.Button(tab_button_frame, text="Move Up", command=self._move_tab_up).pack(side="left", expand=True)
+        ttk.Button(tab_button_frame, text="Move Down", command=self._move_tab_down).pack(side="left", expand=True)
+
+    def _move_tab_up(self):
+        selected_indices = self.tab_listbox.curselection()
+        if not selected_indices:
+            return
+        
+        index = selected_indices[0]
+        if index > 0:
+            tab_name = self.tab_listbox.get(index)
+            self.tab_listbox.delete(index)
+            self.tab_listbox.insert(index - 1, tab_name)
+            self.tab_listbox.selection_set(index - 1)
+            self._save_tab_order()
+
+    def _move_tab_down(self):
+        selected_indices = self.tab_listbox.curselection()
+        if not selected_indices:
+            return
+
+        index = selected_indices[0]
+        if index < self.tab_listbox.size() - 1:
+            tab_name = self.tab_listbox.get(index)
+            self.tab_listbox.delete(index)
+            self.tab_listbox.insert(index + 1, tab_name)
+            self.tab_listbox.selection_set(index + 1)
+            self._save_tab_order()
+
+    def _save_tab_order(self):
+        new_order = list(self.tab_listbox.get(0, tk.END))
+        self.app.config['tab_order'] = new_order
+        with open('config.json', 'w') as f:
+            json.dump(self.app.config, f, indent=4)
+        
+        messagebox.showinfo("Tab Order Saved", "Please restart the application to see the changes.")
+
+    def _load_tab_order(self):
+        self.tab_listbox.delete(0, tk.END)
+        for tab_name in self.app.config.get("tab_order", []):
+            self.tab_listbox.insert(tk.END, tab_name)
 
     def _show_about(self):
         about_window = tk.Toplevel(self)
@@ -267,6 +315,7 @@ class SettingsTab(BaseTab):
     def load_data(self):
         self._load_members()
         self._load_statuses()
+        self._load_tab_order()
 
     def _load_members(self):
         self.member_listbox.delete(0, tk.END)

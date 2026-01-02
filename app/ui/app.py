@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+import json
+import os
 from app.ui.base_tab import BaseTab
 # Import individual tab implementations here
 from app.ui.settings_tab import SettingsTab
@@ -24,25 +26,44 @@ class AttendanceApp(tk.Tk):
         self.attendance_service = AttendanceService()
         self.settings_service = SettingsService()
 
+        self.config = self._load_config()
         self._create_tabs()
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_change)
 
+    def _load_config(self):
+        config_path = "config.json"
+        default_config = {
+            "tab_order": [
+                "Attendance Image Generator",
+                "Daily Standup Entry",
+                "History",
+                "Settings"
+            ]
+        }
+        if not os.path.exists(config_path):
+            with open(config_path, 'w') as f:
+                json.dump(default_config, f, indent=4)
+            return default_config
+        else:
+            with open(config_path, 'r') as f:
+                return json.load(f)
 
     def _create_tabs(self):
-        # Placeholder tabs for now. Will be replaced with actual implementations.
         self.tabs = {}
+        tab_classes = {
+            "Attendance Image Generator": AttendanceImageGeneratorTab,
+            "Daily Standup Entry": DailyStandupEntryTab,
+            "History": HistoryTab,
+            "Settings": SettingsTab
+        }
 
-        self.tabs["Attendance Image Generator"] = AttendanceImageGeneratorTab(self.notebook, self)
-        self.notebook.add(self.tabs["Attendance Image Generator"], text="Attendance Image Generator")
+        tab_order = self.config.get("tab_order", [])
 
-        self.tabs["Daily Standup Entry"] = DailyStandupEntryTab(self.notebook, self)
-        self.notebook.add(self.tabs["Daily Standup Entry"], text="Daily Standup Entry")
-
-        self.tabs["History"] = HistoryTab(self.notebook, self)
-        self.notebook.add(self.tabs["History"], text="History")
-
-        self.tabs["Settings"] = SettingsTab(self.notebook, self)
-        self.notebook.add(self.tabs["Settings"], text="Settings")
+        for tab_name in tab_order:
+            if tab_name in tab_classes:
+                tab_class = tab_classes[tab_name]
+                self.tabs[tab_name] = tab_class(self.notebook, self)
+                self.notebook.add(self.tabs[tab_name], text=tab_name)
 
 
     def _on_tab_change(self, event):
