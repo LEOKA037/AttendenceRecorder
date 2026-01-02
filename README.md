@@ -1,28 +1,20 @@
 # Attendance Recorder
-
+# Created by: VIBE CODING
 This is a desktop application for recording team attendance.
 
 ## Application Features
 
 ### TAB 1: Attendance Image Generator
-- Button to generate attendance image for **previous 5 working days**
-- If continuous 5 days data is NOT available:
-  - Show a clear message indicating missing dates
-  - Still allow image generation
-  - Missing values should be filled as **"NA"**
+- Generates attendance image for **previous 5 working days**
 - Generated output:
-  - Image format (PNG/JPG)
+  - Image format JPG
   - Clean tabular layout
   - Saved locally
+- Preview in the tab and on click of preview open the image in a new window
 
 ### TAB 2: Daily Standup Entry
-- User inputs attendance for team members
-- Attendance dropdown values:
-  - Work From Home
-  - On Time
-  - Late
-  - NA
-- Dropdown values must be configurable from **Settings Tab**
+- User inputs attendance for team members and selects dropdown values
+- User/Dropdown values are configurable from **Settings Tab**
 - Date:
   - Default = today
   - User can change date
@@ -30,16 +22,14 @@ This is a desktop application for recording team attendance.
 - Save data locally
 
 ### TAB 3: History
-- User selects a **date range**
-- Display attendance data in:
-  - Clean table view
-  - User-friendly readable format
-- Now supports editing attendance records.
+- User selects a **date range** and results are displayed
+- Filter by user and status
+- Editing feature on double click
 
 ### TAB 4: Settings
 - Add / Edit / Remove:
   - Team Members
-  - Attendance Status values
+  - Attendance Status values with color codes
 - Changes should reflect immediately in other tabs
 
 ### CALENDAR RULES
